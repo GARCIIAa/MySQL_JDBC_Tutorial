@@ -7,6 +7,12 @@ import java.sql.Statement;
 import java.sql.PreparedStatement;
 import java.sql.Date;
 import java.sql.CallableStatement;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 public class Main {
 
@@ -28,11 +34,12 @@ public class Main {
 		 * Date.valueOf("1990-01-04"), "john.d@yahoo.com", "(408) 898-5641",
 		 * skills);
 		 */
-		
-		//getSkills(136);
-		
-		
 
+		// getSkills(136);
+
+		// writeBlob(136, "johndoe_resume.pdf");
+
+		 readBlob(136, "johndoe_resume_from_db.pdf");
 	}
 
 	public static void queryData() {
@@ -238,5 +245,70 @@ public class Main {
 				System.out.println(e.getMessage());
 			}
 		}
+	}
+
+	public static void writeBlob(int candidateId, String filename) {
+
+		// update sql
+		String updateSQL = "UPDATE candidates " + "SET resume = ? "
+				+ "WHERE id=?";
+
+		try (Connection conn = MySQLJDBCUtil.getConnection();
+				PreparedStatement pstmt = conn.prepareStatement(updateSQL)) {
+
+			// read the file
+			File file = new File(filename);
+			FileInputStream input = new FileInputStream(file);
+
+			// set parameters
+			pstmt.setBinaryStream(1, input);
+			pstmt.setInt(2, candidateId);
+
+			// store the resume file in database
+			System.out.println("Reading file " + file.getAbsolutePath());
+			System.out.println("Store file in the database.");
+			pstmt.executeUpdate();
+
+		} catch (SQLException | FileNotFoundException e) {
+			System.out.println(e.getMessage());
+		}
+	}
+
+	public static void readBlob(int candidateId, String filename) {
+		// update sql
+		String selectSQL = "SELECT resume FROM candidates WHERE id=?";
+		ResultSet rs = null;
+
+		try (Connection conn = MySQLJDBCUtil.getConnection();
+				PreparedStatement pstmt = conn.prepareStatement(selectSQL);) {
+			// set parameter;
+			pstmt.setInt(1, candidateId);
+			rs = pstmt.executeQuery();
+
+			// write binary stream into file
+			File file = new File(filename);
+			FileOutputStream output = new FileOutputStream(file);
+
+			System.out.println("Writing to file " + file.getAbsolutePath());
+			while (rs.next()) {
+				InputStream input = rs.getBinaryStream("resume");
+				byte[] buffer = new byte[1024];
+				while (input.read(buffer) > 0) {
+					output.write(buffer);
+				}
+			}
+			output.close();
+		} catch (SQLException | IOException e) {
+			System.out.println(e.getMessage());
+		} finally {
+			try {
+				if (rs != null) {
+					rs.close();
+				}
+			} catch (SQLException e) {
+				System.out.println(e.getMessage());
+			}
+		}
+
 	}
 }
